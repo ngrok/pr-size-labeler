@@ -1,0 +1,14 @@
+name: 'PR Size Labeler'
+description: 'Labels PRs with the LoC changed'
+inputs:
+  repo-token:
+    description: 'GitHub token'
+    required: true
+  config-path:
+    description: 'Path to pr-size-labeler config file'
+    required: false
+    default: '.github/pr-size-labeler.yml'
+
+runs:
+  using: node16
+  main: invoke-binary.js
