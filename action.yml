@@ -10,5 +10,5 @@ inputs:
     default: '.github/pr-size-labeler.yml'
 
 runs:
-  using: node16
+  using: node20
   main: invoke-binary.js
