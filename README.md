@@ -28,9 +28,9 @@ jobs:
   labeler:
     runs-on: [ubuntu-latest]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v5
     - name: Labeler action
-      uses: ./.
+      uses: ngrok/pr-size-labeler
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 ```
