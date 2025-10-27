@@ -6,4 +6,4 @@ binaries:
 	ls -alth ./bin
 
 test:
-	go test -v -race ./...
+	go test -v -race ./... -coverprofile cover.out
