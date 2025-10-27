@@ -30,7 +30,7 @@ jobs:
     steps:
     - uses: actions/checkout@v5
     - name: Labeler action
-      uses: ngrok/pr-size-labeler
+      uses: ngrok/pr-size-labeler@v1
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
 ```
