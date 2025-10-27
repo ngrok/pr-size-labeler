@@ -28,7 +28,7 @@ func main() {
 	ctx := context.Background()
 	client := github.NewTokenClient(ctx, repoToken)
 
-	labeler, err := newGitHubPRSizeLabeler(client, action, config.Labels)
+	labeler, err := newGitHubPRSizeLabeler(client.Issues, client.PullRequests, action, config.Labels)
 	if err != nil {
 		action.Fatalf("%v", err)
 	}
