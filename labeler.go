@@ -11,46 +11,44 @@ import (
 	"k8s.io/test-infra/prow/gitattributes"
 )
 
+type IssuesClient interface {
+	ListLabels(ctx context.Context, owner, repo string, opts *github.ListOptions) ([]*github.Label, *github.Response, error)
+	AddLabelsToIssue(ctx context.Context, owner, repo string, number int, labels []string) ([]*github.Label, *github.Response, error)
+	RemoveLabelForIssue(ctx context.Context, owner, repo string, number int, label string) (*github.Response, error)
+	CreateLabel(ctx context.Context, owner, repo string, label *github.Label) (*github.Label, *github.Response, error)
+	EditLabel(ctx context.Context, owner, repo, name string, label *github.Label) (*github.Label, *github.Response, error)
+}
+
+type PullRequestsClient interface {
+	ListFiles(ctx context.Context, owner, repo string, number int, opts *github.ListOptions) ([]*github.CommitFile, *github.Response, error)
+}
+
 type GitHubPRSizeLabeler struct {
-	action *githubactions.Action
-	client *github.Client
-	event  github.PullRequestEvent
+	action       *githubactions.Action
+	issues       IssuesClient
+	pullRequests PullRequestsClient
+	event        LabelEvent
 
 	labels []Label `yaml:"labels"`
 }
 
-func newGitHubPRSizeLabeler(client *github.Client, action *githubactions.Action, labels []Label) (*GitHubPRSizeLabeler, error) {
+func newGitHubPRSizeLabeler(issuesClient IssuesClient, pullRequestClient PullRequestsClient, action *githubactions.Action, labels []Label) (*GitHubPRSizeLabeler, error) {
 	event, err := getPREvent(action)
 	if err != nil {
 		return nil, err
 	}
 
 	return &GitHubPRSizeLabeler{
-		client: client,
-		action: action,
-		event:  event,
-		labels: labels,
+		issues:       issuesClient,
+		pullRequests: pullRequestClient,
+		action:       action,
+		event:        event,
+		labels:       labels,
 	}, nil
 }
 
-func (l *GitHubPRSizeLabeler) repoOwner() string {
-	return *l.event.PullRequest.Base.Repo.Owner.Login
-}
-
-func (l *GitHubPRSizeLabeler) repoName() string {
-	return *l.event.PullRequest.Base.Repo.Name
-}
-
-func (l *GitHubPRSizeLabeler) prNumber() int {
-	return *l.event.PullRequest.Number
-}
-
-func (l *GitHubPRSizeLabeler) currentPRLabels() []*github.Label {
-	return l.event.PullRequest.Labels
-}
-
 func (l *GitHubPRSizeLabeler) prHasLabel(label string) bool {
-	for _, l := range l.currentPRLabels() {
+	for _, l := range l.event.PRLabels() {
 		if *l.Name == label {
 			return true
 		}
@@ -70,10 +68,7 @@ func (l *GitHubPRSizeLabeler) loadGitAttributesFile() func() ([]byte, error) {
 
 func (l *GitHubPRSizeLabeler) hasGitattributesFile() bool {
 	_, err := fs.Stat(".gitattributes")
-	if os.IsNotExist(err) {
-		return false
-	}
-	return true
+	return !os.IsNotExist(err)
 }
 
 // CreateSizeLabels creates or updates the configured size labels for the
@@ -92,7 +87,7 @@ func (l *GitHubPRSizeLabeler) CreateSizeLabels(ctx context.Context) error {
 		if !ok {
 			l.action.Infof("Creating label %s", label.Name)
 			// label doesn't exist, create it
-			_, _, err := l.client.Issues.CreateLabel(ctx, l.repoOwner(), l.repoName(), &github.Label{
+			_, _, err := l.issues.CreateLabel(ctx, l.event.RepoOwner(), l.event.RepoName(), &github.Label{
 				Name:        &label.Name,
 				Description: &label.Description,
 				Color:       &label.Color,
@@ -106,7 +101,7 @@ func (l *GitHubPRSizeLabeler) CreateSizeLabels(ctx context.Context) error {
 		// label exists, check if it needs to be updated
 		if !label.Matches(*remoteLabel) {
 			l.action.Infof("Label %s exists but is out of date, updating", label.Name)
-			_, _, err := l.client.Issues.EditLabel(ctx, l.repoOwner(), l.repoName(), label.Name, &github.Label{
+			_, _, err := l.issues.EditLabel(ctx, l.event.RepoOwner(), l.event.RepoName(), label.Name, &github.Label{
 				Name:        &label.Name,
 				Description: &label.Description,
 				Color:       &label.Color,
@@ -156,7 +151,7 @@ func (l *GitHubPRSizeLabeler) AddSizeLabel(ctx context.Context) error {
 		linesChanged += *change.Additions + *change.Deletions
 	}
 
-	l.action.Infof("Calculated PR %d has %d lines changed", l.prNumber(), linesChanged)
+	l.action.Infof("Calculated PR %d has %d lines changed", l.event.PRNumber(), linesChanged)
 
 	sizeLabels := l.labels
 	// Sort the size labels from largest to smallest
@@ -196,7 +191,7 @@ func (l *GitHubPRSizeLabeler) getAllLabels(ctx context.Context) (map[string]*git
 	opts := &github.ListOptions{PerPage: 100}
 
 	for {
-		page, resp, err := l.client.Issues.ListLabels(ctx, l.repoOwner(), l.repoName(), opts)
+		page, resp, err := l.issues.ListLabels(ctx, l.event.RepoOwner(), l.event.RepoName(), opts)
 		if err != nil {
 			return labels, err
 		}
@@ -219,12 +214,12 @@ func (l *GitHubPRSizeLabeler) getAllLabels(ctx context.Context) (map[string]*git
 func (l *GitHubPRSizeLabeler) getPRFilesChanged(ctx context.Context) ([]github.CommitFile, error) {
 	filesChanged := []github.CommitFile{}
 
-	l.action.Infof("Getting files changed in pr #%d", l.prNumber())
+	l.action.Infof("Getting files changed in pr #%d", l.event.PRNumber())
 
 	opts := &github.ListOptions{PerPage: 100}
 
 	for {
-		page, resp, err := l.client.PullRequests.ListFiles(ctx, l.repoOwner(), l.repoName(), l.prNumber(), opts)
+		page, resp, err := l.pullRequests.ListFiles(ctx, l.event.RepoOwner(), l.event.RepoName(), l.event.PRNumber(), opts)
 		if err != nil {
 			return filesChanged, err
 		}
@@ -246,37 +241,39 @@ func (l *GitHubPRSizeLabeler) getPRFilesChanged(ctx context.Context) ([]github.C
 
 func (l *GitHubPRSizeLabeler) addLabel(ctx context.Context, label string) error {
 	l.action.Infof("Adding label %s to pr", label)
-	_, _, err := l.client.Issues.AddLabelsToIssue(ctx, l.repoOwner(), l.repoName(), l.prNumber(), []string{label})
+	_, _, err := l.issues.AddLabelsToIssue(ctx, l.event.RepoOwner(), l.event.RepoName(), l.event.PRNumber(), []string{label})
 	return err
 }
 
 func (l *GitHubPRSizeLabeler) removeLabel(ctx context.Context, label string) error {
 	l.action.Infof("Removing label %s from pr", label)
-	_, err := l.client.Issues.RemoveLabelForIssue(ctx, l.repoOwner(), l.repoName(), l.prNumber(), label)
+	_, err := l.issues.RemoveLabelForIssue(ctx, l.event.RepoOwner(), l.event.RepoName(), l.event.PRNumber(), label)
 	return err
 }
 
-func getPREvent(action *githubactions.Action) (github.PullRequestEvent, error) {
+func getPREvent(action *githubactions.Action) (LabelEvent, error) {
 	ghContext, err := action.Context()
 	if err != nil {
-		return github.PullRequestEvent{}, err
+		return nil, err
 	}
 
 	payloadRaw, err := fs.ReadFile(ghContext.EventPath)
 	if err != nil {
-		return github.PullRequestEvent{}, err
+		return nil, err
 	}
 
 	event, err := github.ParseWebHook(ghContext.EventName, payloadRaw)
 	if err != nil {
-		return github.PullRequestEvent{}, err
+		return nil, err
 	}
 
+	action.Debugf("event: %v", event)
 	switch event := event.(type) {
 	case *github.PullRequestEvent:
-		action.Debugf("event: %v", event)
-		return *event, nil
+		return PullRequestEvent{event: *event}, nil
+	case *github.PullRequestTargetEvent:
+		return PullRequestTargetEvent{event: *event}, nil
 	default:
-		return github.PullRequestEvent{}, fmt.Errorf("Event is not a pull request event")
+		return nil, fmt.Errorf("event %T is not a pull request event", event)
 	}
 }
