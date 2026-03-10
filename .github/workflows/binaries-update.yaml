@@ -1,24 +1,32 @@
 name: Binaries
-on: pull_request_target
-
-permissions:
-  # Needed in order to update the binaries if they've changed
-  contents: write
+on:
+  push:
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
 
 jobs:
   # Updates the binaries for the repo and commits them to the repo.
   update-binaries:
+
     runs-on: ubuntu-latest
+
+    permissions:
+      # Needed in order to update the binaries if they've changed
+      contents: write
+
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
       with:
-        ref: ${{github.event.pull_request.head.ref}}
-        repository: ${{github.event.pull_request.head.repo.full_name}}
-        token: ${{ secrets.GITHUB_TOKEN }}
-    - uses: actions/setup-go@v6
+        ref: ${{ github.ref }}
+    - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417  # v6
       with:
         go-version: '1.25'
-    - run: make binaries
-    - uses: stefanzweifel/git-auto-commit-action@v4
+    - run: |
+        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-s -w" -trimpath -o ./bin/pr-size-labeler-linux-amd64
+        CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -ldflags="-s -w" -trimpath -o ./bin/pr-size-labeler-linux-arm64
+        ls -alth ./bin
+    - uses: stefanzweifel/git-auto-commit-action@04702edda442b2e678b25b537cec683a1493fcb9  # v7
       with:
         commit_message: 'Update binaries'
