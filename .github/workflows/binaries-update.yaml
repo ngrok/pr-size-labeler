@@ -17,16 +17,16 @@ jobs:
       contents: write
 
     steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         ref: ${{ github.ref }}
-    - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417  # v6
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version: '1.25'
+        go-version: '1.26.7'
     - run: |
         CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-s -w" -trimpath -o ./bin/pr-size-labeler-linux-amd64
         CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -ldflags="-s -w" -trimpath -o ./bin/pr-size-labeler-linux-arm64
         ls -alth ./bin
-    - uses: stefanzweifel/git-auto-commit-action@04702edda442b2e678b25b537cec683a1493fcb9  # v7
+    - uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d # v7.2.0
       with:
         commit_message: 'Update binaries'
