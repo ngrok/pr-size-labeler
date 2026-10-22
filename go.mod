@@ -1,6 +1,6 @@
 module github.com/ngrok/pr-size-labeler
 
-go 1.26.7
+go 1.27.3
 
 require (
 	github.com/google/go-github/v50 v50.2.0

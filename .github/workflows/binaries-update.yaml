@@ -5,6 +5,7 @@ on:
       - '**.go'
       - 'go.mod'
       - 'go.sum'
+      - 'Makefile'
 
 jobs:
   # Updates the binaries for the repo and commits them to the repo.
@@ -22,11 +23,8 @@ jobs:
         ref: ${{ github.ref }}
     - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version: '1.26.7'
-    - run: |
-        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags="-s -w" -trimpath -o ./bin/pr-size-labeler-linux-amd64
-        CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -ldflags="-s -w" -trimpath -o ./bin/pr-size-labeler-linux-arm64
-        ls -alth ./bin
+        go-version: '1.27.3'
+    - run: make binaries
     - uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d # v7.2.0
       with:
         commit_message: 'Update binaries'
