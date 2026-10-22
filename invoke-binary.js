@@ -12,13 +12,13 @@ function chooseBinary() {
         return `${BINARY_BASE}-linux-amd64`
     }
     if (platform === 'linux' && arch === 'arm64') {
-        return `${BINARY_NAME}-linux-arm64`
+        return `${BINARY_BASE}-linux-arm64`
     }
-    if (platform === 'windows' && arch === 'x64') {
-        return `${BINARY_NAME}-windows-amd64`
+    if (platform === 'win32' && arch === 'x64') {
+        return `${BINARY_BASE}-windows-amd64.exe`
     }
-    if (platform === 'windows' && arch === 'arm64') {
-        return `${BINARY_NAME}-windows-arm64`
+    if (platform === 'win32' && arch === 'arm64') {
+        return `${BINARY_BASE}-windows-arm64.exe`
     }
 
     console.error(`Unsupported platform (${platform}) and architecture (${arch})`)
